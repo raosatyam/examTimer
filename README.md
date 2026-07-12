@@ -1,6 +1,6 @@
-## examTimer
+# examTimer
 
-# A fully offline, per-question timer for UPSC Mains practice. Set up your paper
+# A fully offline, per-question timer forExam practice. Set up your paper
 (total time + each question's marks and minutes), then run a timed session with
 a large current-question timer, a total-remaining timer, a saved-time buffer,
 color/sound alerts, and a live question list.

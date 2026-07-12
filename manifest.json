@@ -1,19 +1,19 @@
 {
-"name": "UPSC Exam Timer",
-"short_name": "Exam Timer",
-"description": "Per-question timing for UPSC Mains — works fully offline.",
-"start_url": "./index.html",
-"scope": "./",
-"display": "standalone",
-"orientation": "any",
-"background_color": "#0f172a",
-"theme_color": "#0f172a",
-"icons": [
-{
-"src": "icons/icon.svg",
-"sizes": "any",
-"type": "image/svg+xml",
-"purpose": "any maskable"
-}
-]
+    "name": "Exam Timer",
+    "short_name": "Exam Timer",
+    "description": "Per-question timing for Exam — works fully offline.",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
 }
