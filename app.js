@@ -52,8 +52,8 @@ row.querySelector(".del-q").addEventListener("click", () => {
 setup.questions.splice(i, 1);
 saveSetup(); renderQuestionRows(); renderSummary();
 });
-});
 questionRows.appendChild(row);
+});
 }
 function renderSummary() {
 const totalSec = (parseFloat(totalMinutesInput.value) || 0) * 60;
