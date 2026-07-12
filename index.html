@@ -26,20 +26,21 @@
                     <input type="number" id="total-minutes" value="180" min="1" step="1" />
                 </label>
                 <div class="preset-row">
-                    <span class="preset-label">Presets:</span>
-                    <button type="button" class="btn btn-ghost" data-preset="gs">GS: 10×10m + 10×15m</button>
-                    <button type="button" class="btn btn-ghost" data-preset="clear">Clear all</button>
+                    <span class="preset-label">Paper preset:</span>
+                    <select id="preset-select" class="preset-select"></select>
+                    <button type="button" id="clear-all" class="btn btn-ghost">Clear all</button>
                 </div>
-                <div class="preset-row">
-                    <label class="field inline">
-                        <span>10-marker mins</span>
-                        <input type="number" id="preset-10" value="7.5" min="0" step="0.5" />
-                    </label>
-                    <label class="field inline">
-                        <span>15-marker mins</span>
-                        <input type="number" id="preset-15" value="10.5" min="0" step="0.5" />
-                    </label>
+
+                <!-- Custom paper builder (shown only when "Custom…" is selected) -->
+                <div id="custom-builder" class="custom-builder hidden">
+                    <div class="cb-title">Build your paper — add question groups:</div>
+                    <div id="custom-groups"></div>
+                    <button type="button" id="add-group" class="btn btn-ghost">+ Add group</button>
+                    <p class="cb-note">Times auto-fill from your total exam time, proportional to marks. Fine-tune per type below.</p>
                 </div>
+
+                <!-- Time per question type (dynamic; edits auto-apply to all of that type) -->
+                <div id="type-editor" class="type-editor"></div>
             </div>
             <div class="questions-editor">
                 <div class="qe-head">
@@ -95,7 +96,7 @@
                 <button type="button" id="next-btn" class="btn btn-secondary">Next ▶</button>
                 <button type="button" id="pause-btn" class="btn btn-secondary">Pause</button>
                 <button type="button" id="mute-btn" class="btn btn-ghost" aria-pressed="false">🔊 Sound</button>
-                <button type="button" id="wake-btn" class="btn btn-ghost" aria-pressed="true">🔆 Screen on</button>
+                <button type="button" id="wake-btn" class="btn btn-ghost" aria-pressed="true">🔒 Screen on</button>
                 <button type="button" id="reset-btn" class="btn btn-ghost">Reset</button>
             </div>
 
@@ -110,7 +111,10 @@
             <ul id="question-list" class="question-list"></ul>
         </aside>
     </section>
+    <script src="presets.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Visit analytics (private dashboard at roronosy.goatcounter.com). Fails silently offline. -->
     <script data-goatcounter="https://roronoasy.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 </body>
