@@ -1,98 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#0f172a" />
-<title>UPSC Exam Timer</title>
-<link rel="manifest" href="manifest.json" />
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="icons/icon.svg" />
-<link rel="stylesheet" href="styles.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Exam Timer</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-<!-- ============ SETUP SCREEN ============ -->
-<section id="setup-screen" class="screen active">
-<header class="app-header">
-<h1>UPSC Exam Timer</h1>
-<p class="subtitle">Set up your paper, then run a timed session — fully offline.</p>
-</header>
-<div class="setup-body">
-<div class="setup-controls">
-<label class="field">
-<span>Total exam time (minutes)</span>
-<input type="number" id="total-minutes" value="180" min="1" step="1" />
-</label>
-<div class="preset-row">
-<span class="preset-label">Presets:</span>
-<button type="button" class="btn btn-ghost" data-preset="gs">GS: 10×10m + 10×15m</button>
-<button type="button" class="btn btn-ghost" data-preset="clear">Clear all</button>
-</div>
-<div class="preset-row">
-<label class="field inline">
-<span>10-marker mins</span>
-<input type="number" id="preset-10" value="7.5" min="0" step="0.5" />
-</label>
-<label class="field inline">
-<span>15-marker mins</span>
-<input type="number" id="preset-15" value="10.5" min="0" step="0.5" />
-</label>
-</div>
-</div>
-<div class="questions-editor">
-<div class="qe-head">
-<span class="col-num">#</span>
-<span class="col-marks">Marks</span>
-<span class="col-mins">Minutes</span>
-<span class="col-del"></span>
-</div>
-<div id="question-rows"></div>
-<button type="button" id="add-question" class="btn btn-ghost add-q">+ Add question</button>
-</div>
-</div>
-<div class="setup-summary" id="setup-summary"></div>
-<div class="setup-actions">
-<button type="button" id="start-exam" class="btn btn-primary btn-lg">Start Exam</button>
-<span id="resume-note" class="resume-note hidden">
-<button type="button" id="resume-exam" class="btn btn-ghost">Resume last session</button>
-</span>
-</div>
-</section>
-<!-- ============ TIMER SCREEN ============ -->
-<section id="timer-screen" class="screen">
-<div class="timer-main">
-<div class="timer-top">
-<div class="current-meta">
-<span class="q-label">Question <span id="cur-q-num">1</span></span>
-<span class="q-marks-badge" id="cur-q-marks">10 marks</span>
-</div>
-<div class="big-timer" id="big-timer">
-<div class="big-timer-time" id="big-time">07:30</div>
-<div class="big-timer-sub">question time remaining</div>
-</div>
-<div class="secondary-timers">
-<div class="med-timer">
-<div class="med-time" id="total-time">3:00:00</div>
-<div class="med-sub">total remaining</div>
-</div>
-<div class="buffer-box" id="buffer-box">
-<div class="buffer-time" id="buffer-time">+00:00</div>
-<div class="buffer-sub">buffer</div>
-</div>
-</div>
-</div>
-<div class="timer-controls">
-<button type="button" id="done-btn" class="btn btn-primary btn-lg">Mark done → Next</button>
-<button type="button" id="pause-btn" class="btn btn-secondary">Pause</button>
-<button type="button" id="mute-btn" class="btn btn-ghost" aria-pressed="false">🔊 Sound</button>
-<button type="button" id="reset-btn" class="btn btn-ghost">Reset</button>
-</div>
-</div>
-<aside class="side-panel">
-<h2>Questions</h2>
-<ul id="question-list" class="question-list"></ul>
-</aside>
-</section>
-<script src="app.js"></script>
+    <!-- ============ SETUP SCREEN ============ -->
+    <section id="setup-screen" class="screen active">
+        <header class="app-header">
+            <h1>Exam Timer</h1>
+            <p class="subtitle">Set up your paper, then run a timed session — fully offline.</p>
+        </header>
+        <div class="setup-body">
+            <div class="setup-controls">
+                <label class="field">
+                    <span>Total exam time (minutes)</span>
+                    <input type="number" id="total-minutes" value="180" min="1" step="1" />
+                </label>
+                <div class="preset-row">
+                    <span class="preset-label">Presets:</span>
+                    <button type="button" class="btn btn-ghost" data-preset="gs">GS: 10×10m + 10×15m</button>
+                    <button type="button" class="btn btn-ghost" data-preset="clear">Clear all</button>
+                </div>
+                <div class="preset-row">
+                    <label class="field inline">
+                        <span>10-marker mins</span>
+                        <input type="number" id="preset-10" value="7.5" min="0" step="0.5" />
+                    </label>
+                    <label class="field inline">
+                        <span>15-marker mins</span>
+                        <input type="number" id="preset-15" value="10.5" min="0" step="0.5" />
+                    </label>
+                </div>
+            </div>
+            <div class="questions-editor">
+                <div class="qe-head">
+                    <span class="col-num">#</span>
+                    <span class="col-marks">Marks</span>
+                    <span class="col-mins">Minutes</span>
+                    <span class="col-del"></span>
+                </div>
+                <div id="question-rows"></div>
+                <button type="button" id="add-question" class="btn btn-ghost add-q">+ Add question</button>
+            </div>
+        </div>
+        <div class="setup-summary" id="setup-summary"></div>
+        <div class="setup-actions">
+            <button type="button" id="start-exam" class="btn btn-primary btn-lg">Start Exam</button>
+            <span id="resume-note" class="resume-note hidden">
+                <button type="button" id="resume-exam" class="btn btn-ghost">Resume last session</button>
+            </span>
+        </div>
+    </section>
+    <!-- ============ TIMER SCREEN ============ -->
+    <section id="timer-screen" class="screen">
+        <div class="timer-main">
+            <div class="timer-top">
+                <div class="current-meta">
+                    <span class="q-label">Question <span id="cur-q-num">1</span></span>
+                    <span class="q-marks-badge" id="cur-q-marks">10 marks</span>
+                </div>
+                <div class="big-timer" id="big-timer">
+                    <div class="big-timer-time" id="big-time">07:30</div>
+                    <div class="big-timer-sub">question time remaining</div>
+                </div>
+                <div class="secondary-timers">
+                    <div class="med-timer">
+                        <div class="med-time" id="total-time">3:00:00</div>
+                        <div class="med-sub">total remaining</div>
+                    </div>
+                    <div class="buffer-box" id="buffer-box">
+                        <div class="buffer-time" id="buffer-time">+00:00</div>
+                        <div class="buffer-sub">buffer</div>
+                    </div>
+                </div>
+            </div>
+            <div class="timer-controls">
+                <button type="button" id="done-btn" class="btn btn-primary btn-lg">Mark done → Next</button>
+                <button type="button" id="pause-btn" class="btn btn-secondary">Pause</button>
+                <button type="button" id="mute-btn" class="btn btn-ghost" aria-pressed="false">🔊 Sound</button>
+                <button type="button" id="reset-btn" class="btn btn-ghost">Reset</button>
+            </div>
+        </div>
+        <aside class="side-panel">
+            <h2>Questions</h2>
+            <ul id="question-list" class="question-list"></ul>
+        </aside>
+    </section>
+    <script src="app.js"></script>
 </body>
+
 </html>
