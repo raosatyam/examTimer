@@ -4,6 +4,8 @@ Exam Timer — core logic (vanilla JS, offline)
 
 const STORAGE_SETUP = "timer-setup";
 const STORAGE_SESSION = "timer-session";
+const STORAGE_KEEPAWAKE = "timer-keepawake";
+
 
 // Color thresholds as fraction of a question's budget.
 const ORANGE_AT = 0.80; // >= 80% of budget -> orange
@@ -15,6 +17,8 @@ let session = null; // built on Start / Resume
 let tickHandle = null;
 let lastTickMs = null;
 let muted = false;
+let wakeLock = null;
+let keepAwake = true;
 
 /* ---------- Element refs ---------- */
 const $ = (id) => document.getElementById(id);
@@ -258,10 +262,13 @@ function finishExam() {
     $("big-time").textContent = "DONE";
     $("done-btn").disabled = true;
     $("pause-btn").disabled = true;
+    // Release wake lock after finishing if user hasn't requested keep-awake
+    if (!keepAwake) releaseWakeLock();
 }
 
 function resetToSetup() {
     stopTicking();
+    releaseWakeLock();
     localStorage.removeItem(STORAGE_SESSION);
     session = null;
     timerScreen.classList.remove("active");
@@ -357,6 +364,54 @@ function beep(freq, dur) {
 }
 
 /* ============================================================
+SCREEN WAKE LOCK (keep display on)
+============================================================ */
+
+const wakeSupported = () => "wakeLock" in navigator;
+
+async function requestWakeLock() {
+    if (!wakeSupported() || !keepAwake || wakeLock) return; 
+    try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+    } catch (err) {
+        console.error(`${err.name}: ${err.message}`);
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        try {
+            await wakeLock.release();
+        } catch (err) {
+            console.error(`${err.name}: ${err.message}`);
+        }
+        // Ensure internal reference is cleared after releasing
+        wakeLock = null;
+    }
+}
+
+function updateWakeButton() {
+    const btn = $("wake-btn");
+    
+    if (!wakeSupported()) {
+        btn.disabled = true;
+        btn.textContent = "🔆 Not supported";
+        btn.setAttribute("aria-pressed", "false");
+        return;
+    }
+    btn.textContent = keepAwake ? "🔆 Screen on" : "💤 Screen off";
+    btn.setAttribute("aria-pressed", String(keepAwake));
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" &&
+        timerScreen.classList.contains("active")) {
+        requestWakeLock();  
+    }
+});
+
+/* ============================================================
 NAVIGATION
 ============================================================ */
 function enterTimer() {
@@ -367,6 +422,7 @@ function enterTimer() {
     $("pause-btn").textContent = "Pause";
     renderTimer();
     startTicking();
+    requestWakeLock();
 }
 
 function checkResumeAvailable() {
@@ -379,6 +435,8 @@ INIT / EVENT WIRING
 ============================================================ */
 function init() {
     loadSetup();
+    keepAwake = localStorage.getItem(STORAGE_KEEPAWAKE) !== "0";
+    updateWakeButton();
     renderQuestionRows();
     renderSummary();
     checkResumeAvailable();
@@ -396,12 +454,14 @@ function init() {
         saveSession();
         enterTimer();
     });
+    
     $("resume-exam").addEventListener("click", () => {
         const s = loadSession();
         if (!s) { checkResumeAvailable(); return; }
         session = s;
         enterTimer();
     });
+    
     $("done-btn").addEventListener("click", markDone);
     $("prev-btn").addEventListener("click", prevQuestion);
     $("next-btn").addEventListener("click", nextQuestion);
@@ -409,6 +469,7 @@ function init() {
     $("reset-btn").addEventListener("click", () => {
         if (confirm("Reset and return to setup? Current session will be cleared.")) resetToSetup();
     });
+
     $("mute-btn").addEventListener("click", () => {
         muted = !muted;
         const b = $("mute-btn");
@@ -416,6 +477,15 @@ function init() {
         b.setAttribute("aria-pressed", String(muted));
         if (!muted) beep(880, 0.08); // quick confirmation blip
     });
+    
+    $("wake-btn").addEventListener("click", async () => {
+        if (!wakeSupported()) return;
+        keepAwake = !keepAwake;
+        localStorage.setItem(STORAGE_KEEPAWAKE, keepAwake ? "1" : "0");
+        updateWakeButton();
+        if (keepAwake) await requestWakeLock(); else await releaseWakeLock();
+    });
+    
     // Keyboard shortcuts: space = pause, n = next.
     document.addEventListener("keydown", (e) => {
         if (!timerScreen.classList.contains("active")) return;
