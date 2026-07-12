@@ -45,6 +45,10 @@ html, body {
 
 .btn:active { transform: translateY(1px); }
 
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn:disabled:hover { filter: none; }
+
 .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
 
 .btn-secondary { background: var(--panel-2); }
@@ -262,7 +266,11 @@ html, body {
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--panel-2);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
 }
+
+.q-item:hover { border-color: var(--blue); background: var(--panel); }
 
 .q-item .q-idx { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); font-size: .85rem; font-weight:
 600; }

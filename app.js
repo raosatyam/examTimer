@@ -119,22 +119,35 @@ SESSION / TIMER ENGINE
 
 function buildSession() {
     const totalSec = (parseFloat(totalMinutesInput.value) || 0) * 60;
-    const sumBudget = setup.questions.reduce((s, q) => s + (q.minutes || 0) * 60, 0);
     return {
         totalSec,
         questions: setup.questions.map((q) => ({
             marks: q.marks,
             budgetSec: (q.minutes || 0) * 60,
         })),
-        results: setup.questions.map(() => null), // elapsedSec once done
+        elapsed: setup.questions.map(() => 0), // accumulated time per question
+        done: setup.questions.map(() => false), // completed flag per question
         index: 0,
-        questionElapsed: 0,
-        totalElapsed: 0,
-        buffer: totalSec - sumBudget, // starting buffer in seconds
         paused: false,
         finished: false,
         alerted: {}, // per-question threshold flags
     };
+}
+
+// ---- Derived values (single active question ticks, so these are always live) ----
+function sumBudgetSec() {
+    return session.questions.reduce((s, q) => s + q.budgetSec, 0);
+}
+function totalElapsedSec() {
+    return session.elapsed.reduce((s, e) => s + e, 0);
+}
+function bufferSec() {
+    // leftover reserve (exam time not allocated to questions) + time saved on done ones
+    let saved = 0;
+    session.questions.forEach((q, i) => {
+        if (session.done[i]) saved += q.budgetSec - session.elapsed[i];
+    });
+    return (session.totalSec - sumBudgetSec()) + saved;
 }
 
 function saveSession() {
@@ -146,7 +159,7 @@ function loadSession() {
         const raw = localStorage.getItem(STORAGE_SESSION);
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed && parsed.questions && !parsed.finished) return parsed;
+            if (parsed && parsed.questions && Array.isArray(parsed.elapsed) && !parsed.finished) return parsed;
         }
     } catch (e) { /* ignore */ }
     return null;
@@ -167,12 +180,12 @@ function tick() {
     const delta = (now - lastTickMs) / 1000;
     lastTickMs = now;
     if (!session || session.paused || session.finished) return;
-    session.questionElapsed += delta;
-    session.totalElapsed += delta;
+    session.elapsed[session.index] += delta;
+
     checkAlerts();
+
     // Auto-finish whole exam when total time is up.
-    if (session.totalElapsed >= session.totalSec) {
-        session.totalElapsed = session.totalSec;
+    if (totalElapsedSec() >= session.totalSec) {
         renderTimer();
         finishExam();
         return;
@@ -186,7 +199,7 @@ function currentQuestion() { return session.questions[session.index]; }
 function questionState() {
     const q = currentQuestion();
     if (!q || q.budgetSec <= 0) return "green";
-    const frac = session.questionElapsed / q.budgetSec;
+    const frac = session.elapsed[session.index] / q.budgetSec;
     if (frac >= RED_AT) return "red";
     if (frac >= ORANGE_AT) return "orange";
     return "green";
@@ -195,7 +208,7 @@ function questionState() {
 function checkAlerts() {
     const q = currentQuestion();
     if (!q || q.budgetSec <= 0) return;
-    const frac = session.questionElapsed / q.budgetSec;
+    const frac = session.elapsed[session.index] / q.budgetSec;
     const flags = session.alerted[session.index] || {};
     if (frac >= ORANGE_AT && !flags.orange) { flags.orange = true; beep(660, 0.12); }
     if (frac >= RED_AT && !flags.red) { flags.red = true; beep(320, 0.25); }
@@ -204,21 +217,30 @@ function checkAlerts() {
 
 function markDone() {
     if (!session || session.finished) return;
-    const q = currentQuestion();
-    // Unused time -> buffer (negative if overtime).
-    session.buffer += q.budgetSec - session.questionElapsed;
-    session.results[session.index] = session.questionElapsed;
-    // Move to next unfinished question.
-    const next = session.index + 1;
-    if (next >= session.questions.length) {
-        finishExam();
-        return;
+    session.done[session.index] = true;
+
+    // Jump to the next not-done question (wrapping); finish if all are done.
+    const n = session.questions.length;
+    let next = -1;
+    for (let step = 1; step <= n; step++) {
+        const i = (session.index + step) % n;
+        if (!session.done[i]) { next = i; break; }
     }
+    if (next === -1) { finishExam(); return; }
     session.index = next;
-    session.questionElapsed = 0;
     saveSession();
     renderTimer();
 }
+// Jump straight to any question (from side-panel click or Prev/Next).
+function goToQuestion(i) {
+    if (!session || session.finished) return;
+    if (i < 0 || i >= session.questions.length) return;
+    session.index = i;
+    saveSession();
+    renderTimer();
+}
+function nextQuestion() { goToQuestion(session.index + 1); }
+function prevQuestion() { goToQuestion(session.index - 1); }
 
 function togglePause() {
     if (!session || session.finished) return;
@@ -266,8 +288,9 @@ function fmtClock(sec) {
 
 function renderTimer() {
     const q = currentQuestion();
-    const qRemaining = q ? q.budgetSec - session.questionElapsed : 0;
-    const totalRemaining = session.totalSec - session.totalElapsed;
+    const qElapsed = session.elapsed[session.index] || 0;
+    const qRemaining = q ? q.budgetSec - qElapsed : 0;
+    const totalRemaining = session.totalSec - totalElapsedSec();
     // Big timer
     $("cur-q-num").textContent = session.index + 1;
     $("cur-q-marks").textContent = `${q ? q.marks : 0} marks`;
@@ -278,9 +301,12 @@ function renderTimer() {
     // Medium + buffer
     $("total-time").textContent = fmtClock(totalRemaining);
     const bufBox = $("buffer-box");
-    const buf = session.buffer;
+    const buf = bufferSec();
     $("buffer-time").textContent = (buf >= 0 ? "+" : "-") + fmtClock(Math.abs(buf)).replace("-", "");
     bufBox.classList.toggle("negative", buf < 0);
+    // Prev/Next availability
+    $("prev-btn").disabled = session.finished || session.index === 0;
+    $("next-btn").disabled = session.finished || session.index === session.questions.length - 1;
     renderQuestionList();
 }
 
@@ -290,23 +316,22 @@ function renderQuestionList() {
     session.questions.forEach((q, i) => {
         const li = document.createElement("li");
         li.className = "q-item";
+        const elapsed = session.elapsed[i] || 0;
         let status = "";
-        if (i < session.index || session.results[i] != null) {
-            const elapsed = session.results[i];
+        if (session.done[i]) {
             const diff = q.budgetSec - elapsed;
             li.classList.add("done", diff >= 0 ? "saved" : "over");
             status = (diff >= 0 ? "saved " : "over ") + fmtClock(Math.abs(diff));
-        } else if (i === session.index && !session.finished) {
-            li.classList.add("current");
-            status = fmtClock(q.budgetSec - session.questionElapsed);
         } else {
-            status = fmtClock(q.budgetSec);
+            status = fmtClock(q.budgetSec - elapsed);
         }
+        if (i === session.index && !session.finished) li.classList.add("current");
         li.innerHTML = `
 <span class="q-idx">${i + 1}</span>
 <span class="q-info">Q${i + 1}<div class="q-marks">${q.marks} marks · ${fmtMinShort(q.budgetSec / 60)}</div></span>
 <span class="q-status">${status}</span>
 `;
+        li.addEventListener("click", () => goToQuestion(i));
         list.appendChild(li);
     });
 }
@@ -378,6 +403,8 @@ function init() {
         enterTimer();
     });
     $("done-btn").addEventListener("click", markDone);
+    $("prev-btn").addEventListener("click", prevQuestion);
+    $("next-btn").addEventListener("click", nextQuestion);
     $("pause-btn").addEventListener("click", togglePause);
     $("reset-btn").addEventListener("click", () => {
         if (confirm("Reset and return to setup? Current session will be cleared.")) resetToSetup();
@@ -394,6 +421,8 @@ function init() {
         if (!timerScreen.classList.contains("active")) return;
         if (e.code === "Space") { e.preventDefault(); togglePause(); }
         if (e.key === "n" || e.key === "N") markDone();
+        if (e.key === "ArrowLeft") prevQuestion();
+        if (e.key === "ArrowRight") nextQuestion();
     });
 }
 
