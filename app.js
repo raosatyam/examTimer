@@ -195,6 +195,7 @@ session.index = next;
 session.questionElapsed = 0;
 saveSession();
 renderTimer();
+}
 function togglePause() {
 if (!session || session.finished) return;
 session.paused = !session.paused;
