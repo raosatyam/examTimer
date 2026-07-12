@@ -314,6 +314,10 @@ function renderTimer() {
     // Prev/Next availability
     $("prev-btn").disabled = session.finished || session.index === 0;
     $("next-btn").disabled = session.finished || session.index === session.questions.length - 1;
+
+    // Footer (feedback / github) only once the exam is finished, to avoid accidental clicks during the exam.
+    $("timer-footer").classList.toggle("hidden", !session.finished);
+
     renderQuestionList();
 }
 

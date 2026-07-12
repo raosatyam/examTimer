@@ -165,6 +165,17 @@ html, body {
 
 .resume-note { color: var(--muted); }
 
+/* ---------- Footer(feedback / github links) ------ */
+.app-footer {
+    text-align: center;
+    padding: 16px;
+    color: var(--muted);
+    font-size: .8rem;
+}
+.app-footer a { color: var(--muted); text-decoration: none; }
+.app-footer a:hover { color: var(--text); text-decoration: underline; }
+.app-footer .dot { margin: 0 8px; opacity: .5; }
+
 /* ---------- Timer screen ---------- */
 #timer-screen.active { display: grid; }
 
