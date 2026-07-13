@@ -23,10 +23,8 @@ html, body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-.screen { display: none; min-height: 100vh; }
-
+.screen { display: none; min-height: 100vh; min-height: 100dvh; }
 .screen.active { display: block; }
-
 .hidden { display: none !important; }
 
 /* ---------- Buttons ---------- */
@@ -232,11 +230,52 @@ html, body {
 #timer-screen {
     grid-template-columns: 1fr 320px;
     height: 100vh;
+    height: 100dvh;
 }
 
-@media (max-width: 820px) {
-#timer-screen { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-    .side-panel { max-height: 38vh; }
+.timer-fit { display: contents; }
+
+@media (max-width: 820px) and (orientation: portrait) {
+    #timer-screen { 
+        grid-template-columns: 1fr; 
+        grid-template-rows: minmax(0, 3fr) minmax(0, 1fr);
+        overflow: hidden; 
+    }
+    .timer-main { justify-content: center; padding: 0; overflow: hidden; }
+    .timer-fit { 
+        display: flex;
+        flex-direction: column;
+        padding: 14px;
+        transform-origin: center center; 
+    }
+    .timer-top { gap: 14px; }
+    .big-timer { padding: 20px 16px; }
+    .side-panel { 
+        min-height: 0;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        overflow-y: auto; 
+    }
+}
+
+@media (max-height: 480px) {
+    .big-timer-time { font-size: clamp(2.4rem, 12vw, 5rem); }
+    .big-timer { padding: 10px 12px; }
+    .big-timer-sub { display: none; }
+    .secondary-timers { gap: 10px; }
+    .med-time, .buffer-time { font-size: 1.5rem; }
+    .med-time, .buffer-box { padding: 8px 14px; min-width: 110px; }
+    .current-meta { gap: 8px; }
+    .q-label { font-size: 1rem; }
+    .timer-controls { gap: 8px; padding-top: 10px; }
+    .timer-controls .btn { padding: 8px 11px; }
+    .timer-controls .btn-lg { padding: 9px 14px; font-size: 1rem; }
+}
+
+@media (max-width: 420px) {
+    .med-timer, .buffer-box { min-width: 120px; padding: 12px 14px; }
+    .timer-controls .btn { padding: 9px 12px; }
+    .timer-controls .btn-lg { font-size: 1rem; }
 }
 
 .timer-main {
@@ -279,7 +318,7 @@ html, body {
 
 @keyframes pulse { 50% { opacity: .55; } }
 .big-timer-time {
-    font-size: clamp(4rem, 16vw, 9rem);
+    font-size: clamp(3.5rem, 15vmin, 9rem);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -353,3 +392,24 @@ html, body {
 .q-item.done.over .q-status { color: var(--red); }
 
 .q-item.done.saved .q-status { color: var(--green); }
+
+@media (orientation: landscape) and (max-width: 600px) {
+    #timer-screen.active { display: grid; }
+    #timer-screen {
+        grid-template-columns: 1fr 300px; 
+        grid-template-rows: 1fr;
+    }
+    .timer-main { justify-content: center; padding: 0; overflow: hidden; min-height: 0; }
+    .timer-fit {
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        transform-origin: center center;
+    }
+    .side-panel { 
+        min-height: 0;
+        overflow-y: auto;
+        border-top: none;
+        border-left: 1px solid var(--border);
+    }
+}

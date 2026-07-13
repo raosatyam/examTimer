@@ -1,7 +1,7 @@
 /* Simple offline cache for the Exam Timer.
 Bump CACHE_VERSION whenever you change the app files. */
 
-const CACHE_VERSION = "timer-v0.2";
+const CACHE_VERSION = "timer-v0.3";
 
 const ASSETS = [
     "./",

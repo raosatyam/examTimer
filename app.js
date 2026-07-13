@@ -382,6 +382,7 @@ function finishExam() {
     $("pause-btn").disabled = true;
     // Release wake lock after finishing if user hasn't requested keep-awake
     if (!keepAwake) releaseWakeLock();
+    requestAnimationFrame(fitTimer); 
 }
 
 function resetToSetup() {
@@ -536,6 +537,21 @@ document.addEventListener("visibilitychange", () => {
 /* ============================================================
 NAVIGATION
 ============================================================ */
+
+// Portrait phones: scale the timer block down so it fits its 75% cell (zoom out to fit).
+function fitTimer() {
+    const main = document.querySelector(".timer-main");
+    const fit = document.querySelector(".timer-fit");
+    if (!main || !fit) return;
+    fit.style.transform = ""; // reset before measuring natural size
+    // Only scale when the css has turned the wrapper into a real box (i.e. a compact layout).
+    // On desktop the wrapper is `display: contents` and we don't want to scale that.
+    if (getComputedStyle(fit).display === "contents") return;
+    const avail = main.clientHeight; // the timer cell (75% in portrait, full height in landscape)
+    const needed = fit.scrollHeight; // the timer block's natural height
+    if (needed > avail && avail > 0) fit.style.transform = `scale(${avail / needed})`;
+}
+
 function enterTimer() {
     setupScreen.classList.remove("active");
     timerScreen.classList.add("active");
@@ -545,6 +561,7 @@ function enterTimer() {
     renderTimer();
     startTicking();
     requestWakeLock();
+    requestAnimationFrame(fitTimer);
 }
 
 function checkResumeAvailable() {
@@ -564,6 +581,11 @@ function init() {
     renderTypeEditor();
     renderSummary();
     checkResumeAvailable();
+
+    // Re-fit the timer when the viewport changes (rotate / resize / on =screen keyboard).
+    window.addEventListener("resize", fitTimer);
+    window.addEventListener("orientationchange", fitTimer);
+
     totalMinutesInput.addEventListener("input", () => {
         saveSetup();
         // In custom mode, total time drives the proportional per-question times.
