@@ -4,6 +4,8 @@ Exam Timer — core logic (vanilla JS, offline)
 
 const STORAGE_SETUP = "timer-setup";
 const STORAGE_SESSION = "timer-session";
+const STORAGE_KEEPAWAKE = "timer-keepawake";
+
 
 // Color thresholds as fraction of a question's budget.
 const ORANGE_AT = 0.80; // >= 80% of budget -> orange
@@ -15,6 +17,9 @@ let session = null; // built on Start / Resume
 let tickHandle = null;
 let lastTickMs = null;
 let muted = false;
+let wakeLock = null;
+let keepAwake = true;
+let customGroups = [{ marks: 10, count: 10 }]; // working state for the Custom preset builder
 
 /* ---------- Element refs ---------- */
 const $ = (id) => document.getElementById(id);
@@ -49,15 +54,15 @@ function renderQuestionRows() {
 `;
         row.querySelector(".q-marks").addEventListener("input", (e) => {
             q.marks = parseFloat(e.target.value) || 0;
-            saveSetup(); renderSummary();
+            saveSetup(); renderTypeEditor(); renderSummary();
         });
         row.querySelector(".q-mins").addEventListener("input", (e) => {
             q.minutes = parseFloat(e.target.value) || 0;
-            saveSetup(); renderSummary();
+            saveSetup(); renderTypeEditor(); renderSummary();
         });
         row.querySelector(".del-q").addEventListener("click", () => {
             setup.questions.splice(i, 1);
-            saveSetup(); renderQuestionRows(); renderSummary();
+            saveSetup(); renderQuestionRows(); renderTypeEditor(); renderSummary();
         });
         questionRows.appendChild(row);
     });
@@ -82,17 +87,134 @@ function fmtMinShort(mins) {
     return `${m}m${s ? " " + s + "s" : ""}`;
 }
 
-function applyPreset(kind) {
-    if (kind === "clear") {
-        setup.questions = [];
-    } else if (kind === "gs") {
-        const m10 = parseFloat($("preset-10").value) || 7.5;
-        const m15 = parseFloat($("preset-15").value) || 10.5;
-        setup.questions = [];
-        for (let i = 0; i < 10; i++) setup.questions.push({ marks: 10, minutes: m10 });
-        for (let i = 0; i < 10; i++) setup.questions.push({ marks: 15, minutes: m15 });
-    }
-    saveSetup(); renderQuestionRows(); renderSummary();
+function round2(n) { return Math.round((n || 0) * 100) / 100; }
+
+// Re-render the whole setup area after questions change.
+function refreshSetup() {
+    renderQuestionRows();
+    renderTypeEditor();
+    renderSummary();
+}
+
+// Expand preset groups into a flat question list.
+// A group without `minutes` gets time proportional to its marks share of the total.
+function expandGroups(groups, totalMinutes) {
+    const totalMarks = groups.reduce((s, g) => s + (g.marks || 0) * (g.count || 0), 0);
+    const questions = [];
+    groups.forEach((g) => {
+        const count = Math.max(0, Math.floor(g.count || 0));
+        let minutes;
+        if (g.minutes != null) minutes = g.minutes;
+        else if (totalMarks > 0) minutes = round2(totalMinutes * (g.marks / totalMarks));
+        else minutes = 0;
+        for (let i = 0; i < count; i++) questions.push({ marks: g.marks, minutes });
+    });
+    return questions;
+}
+
+function applyPreset(id) {
+    const preset = PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    if (preset.totalMinutes) totalMinutesInput.value = preset.totalMinutes;
+    const totalMinutes = parseFloat(totalMinutesInput.value) || 0;
+    setup.questions = expandGroups(preset.groups, totalMinutes);
+    saveSetup();
+    refreshSetup();
+}
+
+function clearAll() {
+    setup.questions = [];
+    saveSetup();
+    refreshSetup();
+}
+
+function populatePresetDropdown() {
+    const sel = $("preset-select");
+    sel.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "Load a preset…"; ph.disabled = true; ph.selected = true;
+    sel.appendChild(ph);
+    PRESETS.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.id; opt.textContent = p.name;
+        sel.appendChild(opt);
+    });
+    const custom = document.createElement("option");
+    custom.value = "__custom__"; custom.textContent = "Custom…";
+    sel.appendChild(custom);
+}
+
+/* ---------- Time-per-type editor (edits auto-apply to all of that type) ---------- */
+function renderTypeEditor() {
+    const wrap = $("type-editor");
+    const groups = {};
+    setup.questions.forEach((q) => {
+        if (!groups[q.marks]) groups[q.marks] = { marks: q.marks, count: 0, minutes: q.minutes };
+        groups[q.marks].count++;
+    });
+    const keys = Object.keys(groups).map(Number).sort((a, b) => a - b);
+    if (keys.length === 0) { wrap.innerHTML = ""; return; }
+
+    wrap.innerHTML = `<div class="te-title">Time per question type <span class="te-hint">(auto-applies to all of that type)</span></div>`;
+    keys.forEach((k) => {
+        const g = groups[k];
+        const row = document.createElement("div");
+        row.className = "te-row";
+        row.innerHTML = `
+            <span class="te-label">${g.marks} marks × ${g.count}</span>
+            <input type="number" class="te-mins" min="0" step="0.5" value="${round2(g.minutes)}" />
+            <span class="te-unit">min each</span>
+        `;
+        row.querySelector(".te-mins").addEventListener("input", (e) => {
+            const v = parseFloat(e.target.value);
+            if (isNaN(v)) return;
+            setup.questions.forEach((q) => { if (q.marks === g.marks) q.minutes = v; });
+            saveSetup();
+            renderQuestionRows(); // reflect new minutes in per-question rows
+            renderSummary();
+            // deliberately NOT re-rendering the type editor, to keep input focus
+        });
+        wrap.appendChild(row);
+    });
+}
+
+/* ---------- Custom paper builder ---------- */
+function renderCustomGroups() {
+    const wrap = $("custom-groups");
+    wrap.innerHTML = "";
+    customGroups.forEach((g, i) => {
+        const row = document.createElement("div");
+        row.className = "cb-row";
+        row.innerHTML = `
+            <input type="number" class="cb-marks" min="0" step="1" value="${g.marks}" />
+            <span>marks ×</span>
+            <input type="number" class="cb-count" min="1" step="1" value="${g.count}" />
+            <span>questions</span>
+            <button type="button" class="del-q cb-del" title="Remove group" aria-label="Remove group">×</button>
+        `;
+        row.querySelector(".cb-marks").addEventListener("input", (e) => {
+            g.marks = parseFloat(e.target.value) || 0; rebuildFromCustom();
+        });
+        row.querySelector(".cb-count").addEventListener("input", (e) => {
+            g.count = parseInt(e.target.value, 10) || 0; rebuildFromCustom();
+        });
+        row.querySelector(".cb-del").addEventListener("click", () => {
+            customGroups.splice(i, 1);
+            if (customGroups.length === 0) customGroups.push({ marks: 10, count: 1 });
+            renderCustomGroups(); rebuildFromCustom();
+        });
+        wrap.appendChild(row);
+    });
+}
+
+function rebuildFromCustom() {
+    const totalMinutes = parseFloat(totalMinutesInput.value) || 0;
+    const groups = customGroups
+        .filter((g) => g.marks > 0 && g.count > 0)
+        .map((g) => ({ marks: g.marks, count: g.count })); // no minutes → proportional fill
+    setup.questions = expandGroups(groups, totalMinutes);
+    saveSetup();
+    refreshSetup();
 }
 
 function saveSetup() {
@@ -258,10 +380,14 @@ function finishExam() {
     $("big-time").textContent = "DONE";
     $("done-btn").disabled = true;
     $("pause-btn").disabled = true;
+    // Release wake lock after finishing if user hasn't requested keep-awake
+    if (!keepAwake) releaseWakeLock();
+    requestAnimationFrame(fitTimer); 
 }
 
 function resetToSetup() {
     stopTicking();
+    releaseWakeLock();
     localStorage.removeItem(STORAGE_SESSION);
     session = null;
     timerScreen.classList.remove("active");
@@ -307,6 +433,10 @@ function renderTimer() {
     // Prev/Next availability
     $("prev-btn").disabled = session.finished || session.index === 0;
     $("next-btn").disabled = session.finished || session.index === session.questions.length - 1;
+
+    // Footer (feedback / github) only once the exam is finished, to avoid accidental clicks during the exam.
+    $("timer-footer").classList.toggle("hidden", !session.finished);
+
     renderQuestionList();
 }
 
@@ -357,8 +487,71 @@ function beep(freq, dur) {
 }
 
 /* ============================================================
+SCREEN WAKE LOCK (keep display on)
+============================================================ */
+
+const wakeSupported = () => "wakeLock" in navigator;
+
+async function requestWakeLock() {
+    if (!wakeSupported() || !keepAwake || wakeLock) return; 
+    try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+    } catch (err) {
+        console.error(`${err.name}: ${err.message}`);
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        try {
+            await wakeLock.release();
+        } catch (err) {
+            console.error(`${err.name}: ${err.message}`);
+        }
+        // Ensure internal reference is cleared after releasing
+        wakeLock = null;
+    }
+}
+
+function updateWakeButton() {
+    const btn = $("wake-btn");
+    
+    if (!wakeSupported()) {
+        btn.disabled = true;
+        btn.textContent = "🔒 Not supported";
+        btn.setAttribute("aria-pressed", "false");
+        return;
+    }
+    btn.textContent = keepAwake ? "🔒 Screen on" : "💤 Screen off";
+    btn.setAttribute("aria-pressed", String(keepAwake));
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" &&
+        timerScreen.classList.contains("active")) {
+        requestWakeLock();  
+    }
+});
+
+/* ============================================================
 NAVIGATION
 ============================================================ */
+
+// Portrait phones: scale the timer block down so it fits its 75% cell (zoom out to fit).
+function fitTimer() {
+    const main = document.querySelector(".timer-main");
+    const fit = document.querySelector(".timer-fit");
+    if (!main || !fit) return;
+    fit.style.transform = ""; // reset before measuring natural size
+    // Only scale when the css has turned the wrapper into a real box (i.e. a compact layout).
+    // On desktop the wrapper is `display: contents` and we don't want to scale that.
+    if (getComputedStyle(fit).display === "contents") return;
+    const avail = main.clientHeight; // the timer cell (75% in portrait, full height in landscape)
+    const needed = fit.scrollHeight; // the timer block's natural height
+    if (needed > avail && avail > 0) fit.style.transform = `scale(${avail / needed})`;
+}
+
 function enterTimer() {
     setupScreen.classList.remove("active");
     timerScreen.classList.add("active");
@@ -367,6 +560,8 @@ function enterTimer() {
     $("pause-btn").textContent = "Pause";
     renderTimer();
     startTicking();
+    requestWakeLock();
+    requestAnimationFrame(fitTimer);
 }
 
 function checkResumeAvailable() {
@@ -375,20 +570,51 @@ function checkResumeAvailable() {
 }
 
 /* ============================================================
-INIT / EVENT WIRING
-============================================================ */
+   INIT / EVENT WIRING
+   ============================================================ */
 function init() {
     loadSetup();
+    keepAwake = localStorage.getItem(STORAGE_KEEPAWAKE) !== "0";
+    updateWakeButton();
+    populatePresetDropdown();
     renderQuestionRows();
+    renderTypeEditor();
     renderSummary();
     checkResumeAvailable();
-    totalMinutesInput.addEventListener("input", () => { saveSetup(); renderSummary(); });
+
+    // Re-fit the timer when the viewport changes (rotate / resize / on =screen keyboard).
+    window.addEventListener("resize", fitTimer);
+    window.addEventListener("orientationchange", fitTimer);
+
+    totalMinutesInput.addEventListener("input", () => {
+        saveSetup();
+        // In custom mode, total time drives the proportional per-question times.
+        if (!$("custom-builder").classList.contains("hidden")) rebuildFromCustom();
+        else renderSummary();
+    });
     $("add-question").addEventListener("click", () => {
         setup.questions.push({ marks: 10, minutes: 7.5 });
-        saveSetup(); renderQuestionRows(); renderSummary();
+        saveSetup(); refreshSetup();
     });
-    document.querySelectorAll("[data-preset]").forEach((btn) =>
-        btn.addEventListener("click", () => applyPreset(btn.dataset.preset)));
+
+    $("preset-select").addEventListener("change", (e) => {
+        const val = e.target.value;
+        if (!val) return;
+        if (val === "__custom__") {
+            $("custom-builder").classList.remove("hidden");
+            renderCustomGroups();
+            rebuildFromCustom();
+        } else {
+            $("custom-builder").classList.add("hidden");
+            applyPreset(val);
+        }
+    });
+    $("clear-all").addEventListener("click", clearAll);
+    $("add-group").addEventListener("click", () => {
+        customGroups.push({ marks: 10, count: 1 });
+        renderCustomGroups(); rebuildFromCustom();
+    });
+
     $("start-exam").addEventListener("click", () => {
         saveSetup();
         if (setup.questions.length === 0) { alert("Add at least one question."); return; }
@@ -396,12 +622,14 @@ function init() {
         saveSession();
         enterTimer();
     });
+    
     $("resume-exam").addEventListener("click", () => {
         const s = loadSession();
         if (!s) { checkResumeAvailable(); return; }
         session = s;
         enterTimer();
     });
+    
     $("done-btn").addEventListener("click", markDone);
     $("prev-btn").addEventListener("click", prevQuestion);
     $("next-btn").addEventListener("click", nextQuestion);
@@ -409,6 +637,7 @@ function init() {
     $("reset-btn").addEventListener("click", () => {
         if (confirm("Reset and return to setup? Current session will be cleared.")) resetToSetup();
     });
+
     $("mute-btn").addEventListener("click", () => {
         muted = !muted;
         const b = $("mute-btn");
@@ -416,6 +645,15 @@ function init() {
         b.setAttribute("aria-pressed", String(muted));
         if (!muted) beep(880, 0.08); // quick confirmation blip
     });
+    
+    $("wake-btn").addEventListener("click", async () => {
+        if (!wakeSupported()) return;
+        keepAwake = !keepAwake;
+        localStorage.setItem(STORAGE_KEEPAWAKE, keepAwake ? "1" : "0");
+        updateWakeButton();
+        if (keepAwake) await requestWakeLock(); else await releaseWakeLock();
+    });
+    
     // Keyboard shortcuts: space = pause, n = next.
     document.addEventListener("keydown", (e) => {
         if (!timerScreen.classList.contains("active")) return;
